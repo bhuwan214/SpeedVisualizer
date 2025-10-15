@@ -1,0 +1,10 @@
+/* Minimal helpers; most layout is done with Tailwind classes */
+.center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.muted {
+  color: #9ca3af;
+}
