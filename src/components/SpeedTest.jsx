@@ -58,15 +58,15 @@ export default function SpeedTest() {
                     initial={{ width: '0%' }}
                     animate={{ width: '100%' }}
                     transition={{ 
-                      duration: testPhase === 'ping' ? 2 : 5, 
+                      duration: testPhase === 'ping' ? 2 : 7, 
                       ease: 'linear' 
                     }}
                   />
                 </div>
                 <p className="text-xs text-slate-400 text-center mt-2">
                   {testPhase === 'ping' && 'Checking latency...'}
-                  {testPhase === 'download' && 'Measuring download speed...'}
-                  {testPhase === 'upload' && 'Measuring upload speed...'}
+                  {testPhase === 'download' && 'Measuring download speed (7 seconds)...'}
+                  {testPhase === 'upload' && 'Measuring upload speed (7 seconds)...'}
                 </p>
               </div>
             )}

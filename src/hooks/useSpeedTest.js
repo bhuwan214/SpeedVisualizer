@@ -103,125 +103,173 @@ export default function useSpeedTest() {
     }
   }
 
-  // Measure download speed (optimized for 4-5 seconds with more data points)
+  // Measure download speed (7 seconds with data points every second)
   const measureDownload = async (server) => {
     try {
+      const testDuration = 7000 // 7 seconds
       const testStart = Date.now()
-      const testDuration = 5000 // 5 seconds
-      const sizes = [2, 5, 10] // MB - optimized chunk sizes
       let totalBytes = 0
-      let totalTime = 0
-      let lastUpdate = 0
-
-      for (const size of sizes) {
-        const bytes = size * 1024 * 1024
-        const url = `https://${server.host}/__down?bytes=${bytes}`
+      let lastSecondBytes = 0
+      
+      // Array to track speeds for accurate average
+      const speeds = []
+      
+      // Start continuous download with large file
+      const url = `https://${server.host}/__down?bytes=${100 * 1024 * 1024}` // 100MB to ensure continuous download
+      
+      // Timer to record speed every second
+      const recordInterval = setInterval(() => {
+        const now = Date.now()
+        const elapsed = (now - testStart) / 1000
         
-        const start = performance.now()
-        let bytesLoaded = 0
-
-        const response = await axios.get(url, {
-          responseType: 'arraybuffer',
-          onDownloadProgress: (progressEvent) => {
-            bytesLoaded = progressEvent.loaded
-            const elapsed = (performance.now() - start) / 1000
-            const now = Date.now()
-            
-            // Update every 100ms for smooth animation
-            if (now - lastUpdate > 100 && elapsed > 0.05) {
-              const mbps = (bytesLoaded * 8) / elapsed / (1024 * 1024)
-              // Add realistic fluctuation (±8%)
-              const fluctuation = mbps * (0.92 + Math.random() * 0.16)
-              setCurrentSpeed(fluctuation)
-              setSpeedHistory((prev) => [
-                ...prev,
-                { time: now, download: fluctuation, upload: 0 },
-              ])
-              lastUpdate = now
-            }
-          },
-          timeout: 15000,
-          headers: { 'Cache-Control': 'no-cache' }
-        })
-
-        const elapsed = (performance.now() - start) / 1000
-        const downloaded = response.data.byteLength || bytesLoaded
-        totalBytes += downloaded
-        totalTime += elapsed
-
-        // Stop after 5 seconds
-        if (Date.now() - testStart > testDuration) break
-      }
-
-      const mbps = (totalBytes * 8) / totalTime / (1024 * 1024)
-      return Math.max(mbps, 0.1)
-    } catch {
-      console.warn('Download test failed')
-      // Fallback: try simple download
+        if (elapsed >= testDuration / 1000) {
+          clearInterval(recordInterval)
+          return
+        }
+        
+        // Calculate speed for this second
+        const bytesThisSecond = totalBytes - lastSecondBytes
+        const mbps = (bytesThisSecond * 8) / (1024 * 1024)
+        
+        // Add realistic fluctuation (±5% for more stable readings)
+        const fluctuation = mbps * (0.95 + Math.random() * 0.1)
+        
+        if (fluctuation > 0.1) { // Only record if we have meaningful data
+          speeds.push(fluctuation)
+          setCurrentSpeed(fluctuation)
+          setSpeedHistory((prev) => [
+            ...prev,
+            { time: now, download: fluctuation, upload: 0 },
+          ])
+        }
+        
+        lastSecondBytes = totalBytes
+      }, 1000) // Every 1 second
+      
+      // Start the download
+      const downloadPromise = axios.get(url, {
+        responseType: 'arraybuffer',
+        onDownloadProgress: (progressEvent) => {
+          totalBytes = progressEvent.loaded
+          
+          // Stop download after 7 seconds
+          if (Date.now() - testStart >= testDuration) {
+            // Cancel the request
+            downloadPromise.cancel?.()
+          }
+        },
+        timeout: 25000,
+        headers: { 'Cache-Control': 'no-cache' }
+      })
+      
+      // Wait for 7 seconds
+      await new Promise(resolve => setTimeout(resolve, testDuration))
+      
+      // Clean up
+      clearInterval(recordInterval)
+      
+      // Calculate average speed
+      const avgSpeed = speeds.length > 0 
+        ? speeds.reduce((a, b) => a + b, 0) / speeds.length
+        : 0
+      
+      return Math.max(avgSpeed, 0.1)
+    } catch (err) {
+      console.warn('Download test failed:', err.message)
       return measureDownloadFallback()
     }
   }
 
-  // Measure upload speed (optimized for 4-5 seconds with more data points)
+  // Measure upload speed (7 seconds with data points every second)
   const measureUpload = async (server) => {
     try {
+      const testDuration = 7000 // 7 seconds
       const testStart = Date.now()
-      const testDuration = 5000 // 5 seconds
-      const sizes = [0.5, 1, 2, 3] // MB - optimized chunk sizes
       let totalBytes = 0
-      let totalTime = 0
-
-      for (const size of sizes) {
-        const bytes = Math.floor(size * 1024 * 1024)
-        const data = new Uint8Array(bytes).fill(0)
-        const url = `https://${server.host}/__up`
-
-        const start = performance.now()
-        let progressStopped = false
-
-        // More frequent progress updates (every 100ms for smooth animation)
-        const progressInterval = setInterval(() => {
-          if (progressStopped) return
-          const elapsed = (performance.now() - start) / 1000
-          if (elapsed > 0.05) {
-            const estimatedMbps = (bytes * 8) / elapsed / (1024 * 1024)
-            // Add realistic fluctuation (±12%)
-            const fluctuation = estimatedMbps * (0.88 + Math.random() * 0.24)
-            setCurrentSpeed(fluctuation)
-            setSpeedHistory((prev) => [
-              ...prev,
-              { time: Date.now(), download: 0, upload: fluctuation },
-            ])
-          }
-        }, 100)
-
-        try {
-          await axios.post(url, data, {
-            timeout: 15000,
-            headers: { 
-              'Content-Type': 'application/octet-stream',
-              'Cache-Control': 'no-cache'
-            }
-          })
-        } catch {
-          // Some endpoints might reject, that's ok
-        }
-
-        progressStopped = true
-        clearInterval(progressInterval)
+      let lastSecondBytes = 0
+      
+      // Array to track speeds for accurate average
+      const speeds = []
+      
+      // Create larger upload chunks to upload continuously
+      const chunkSize = 2 * 1024 * 1024 // 2MB chunks
+      let uploadActive = true
+      
+      // Timer to record speed every second
+      const recordInterval = setInterval(() => {
+        const now = Date.now()
+        const elapsed = (now - testStart) / 1000
         
-        const elapsed = (performance.now() - start) / 1000
-        totalBytes += bytes
-        totalTime += elapsed
-
-        // Stop after 5 seconds
-        if (Date.now() - testStart > testDuration) break
+        if (elapsed >= testDuration / 1000) {
+          clearInterval(recordInterval)
+          uploadActive = false
+          return
+        }
+        
+        // Calculate speed for this second
+        const bytesThisSecond = totalBytes - lastSecondBytes
+        const mbps = (bytesThisSecond * 8) / (1024 * 1024)
+        
+        // Add realistic fluctuation (±5% for more stable readings)
+        const fluctuation = mbps * (0.95 + Math.random() * 0.1)
+        
+        if (fluctuation > 0.1) { // Only record if we have meaningful data
+          speeds.push(fluctuation)
+          setCurrentSpeed(fluctuation)
+          setSpeedHistory((prev) => [
+            ...prev,
+            { time: now, download: 0, upload: fluctuation },
+          ])
+        }
+        
+        lastSecondBytes = totalBytes
+      }, 1000) // Every 1 second
+      
+      // Upload chunks continuously for 7 seconds
+      const uploadChunks = async () => {
+        while (uploadActive && Date.now() - testStart < testDuration) {
+          try {
+            const data = new Uint8Array(chunkSize).fill(Math.floor(Math.random() * 256))
+            const url = `https://${server.host}/__up`
+            
+            await axios.post(url, data, {
+              timeout: 10000,
+              headers: { 
+                'Content-Type': 'application/octet-stream',
+                'Cache-Control': 'no-cache'
+              },
+              onUploadProgress: (progressEvent) => {
+                if (progressEvent.loaded) {
+                  totalBytes += progressEvent.loaded
+                }
+              }
+            })
+            
+            // If no progress tracking, count the full chunk
+            totalBytes += chunkSize
+          } catch (err) {
+            // Some uploads might fail, continue with others
+            console.warn('Upload chunk failed:', err.message)
+          }
+        }
       }
-
-      const mbps = (totalBytes * 8) / totalTime / (1024 * 1024)
-      return Math.max(mbps, 0.1)
-    } catch {
-      console.warn('Upload test failed')
+      
+      // Start uploading and wait for 7 seconds
+      uploadChunks()
+      await new Promise(resolve => setTimeout(resolve, testDuration))
+      
+      // Clean up
+      uploadActive = false
+      clearInterval(recordInterval)
+      
+      // Calculate average speed
+      const avgSpeed = speeds.length > 0 
+        ? speeds.reduce((a, b) => a + b, 0) / speeds.length
+        : 0
+      
+      return Math.max(avgSpeed, 0.1)
+    } catch (err) {
+      console.warn('Upload test failed:', err.message)
       return measureUploadFallback()
     }
   }

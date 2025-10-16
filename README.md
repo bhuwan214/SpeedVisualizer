@@ -6,7 +6,8 @@ A modern, interactive web application that measures and visualizes your internet
 
 - **Real-time Speed Testing**: Measures download, upload speeds, and ping/latency
 - **Live Fluctuation Graph**: Shows real-time speed variations during test (like Speedtest.net)
-- **Circular Speedometer**: Animated gauge displaying current speed
+- **Circular Speedometer**: Animated gauge displaying current speed with dynamic effects
+- **ISP & Location Insights**: Displays your ISP name, city, country, connection type, and interactive map
 - **Test History**: Stores and displays your last 20 tests in localStorage
 - **Responsive Design**: Works beautifully on desktop and mobile devices
 - **Smooth Animations**: Powered by Framer Motion for fluid UI transitions
@@ -20,6 +21,8 @@ A modern, interactive web application that measures and visualizes your internet
 - **Framer Motion** - Animation library
 - **Chart.js + react-chartjs-2** - Interactive charts
 - **Axios** - HTTP client for speed tests
+- **React-Leaflet + Leaflet** - Interactive maps for location display
+- **ipapi.co** - IP geolocation API
 
 ## 📦 Installation
 
@@ -39,11 +42,12 @@ The app will be available at `http://localhost:5173` (or the port shown in termi
 
 ## 🎮 Usage
 
-1. Click the **"Start Test"** button to begin
-2. Watch the circular speedometer and live graph as the test runs
-3. View your results: Download, Upload, and Ping
-4. Click **"Show Previous Tests"** to see your test history
-5. Run multiple tests to see fluctuation trends
+1. **View Location Info**: See your ISP, location, and connection type on the interactive map
+2. Click the **"Start Test"** button to begin speed testing
+3. Watch the circular speedometer and live graph as the test runs
+4. View your results: Download, Upload, and Ping
+5. Click **"Show Previous Tests"** to see your test history
+6. Use **"Refresh Location"** button to update your location data
 
 ## 🔧 Build for Production
 
